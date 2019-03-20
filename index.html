@@ -1,0 +1,183 @@
+
+<!doctype html>
+<html>
+
+<head>
+	<title>Chart</title>
+	<script src="./js/Chart.bundle.js"></script>
+	<script src="./js/utils.js"></script>
+    <!-- for firebase -->
+    <script defer src="/__/firebase/4.1.3/firebase-app.js"></script>
+    <script defer src="/__/firebase/4.1.3/firebase-database.js"></script>
+    <script defer src="/__/firebase/init.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+	<style>
+	canvas{
+		-moz-user-select: none;
+		-webkit-user-select: none;
+		-ms-user-select: none;
+	}
+	</style>
+    <!--フルスクリーン対応-->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="initial-scale=1.0">
+</head>
+
+<body>
+	<div style="width:100%;">
+		<canvas id="canvas"></canvas>
+	</div>
+	<script>
+		// 不快指数計算
+		function updateDiscomfortIndex(){
+			// 最新の温度湿度を取得して不快指数を計算
+			var temperature = temperatures.slice(-1)[0];
+			var humidity = humiditys.slice(-1)[0];
+			var discomfort_index = Math.round(0.81 * temperature + 0.01 * humidity * (0.99 * temperature - 14.3) + 46.3);
+			$("h2.discomfortIndex").text(discomfort_index);
+
+			if (discomfort_index < 55){
+				$("h2.feels").text("寒い");
+				$("h2.feels").css('color', '#0000FF');
+				$("h2.problem").text("ウイルス活動");
+				$("h2.problem").css('color', '#0000FF');
+			} else if (55 <= discomfort_index && discomfort_index < 60 ){
+				$("h2.feels").text("肌寒い");
+				$("h2.feels").css('color', '#00FFFF');
+				$("h2.problem").text("ウイルス活動");
+				$("h2.problem").css('color', '#00FFFF');
+			} else if (60 <= discomfort_index && discomfort_index < 70 ){
+				$("h2.feels").text("快適");
+				$("h2.feels").css('color', '#00FF00');
+				$("h2.problem").text("問題なし");
+				$("h2.problem").css('color', '#00FF00');
+			} else if (70 <= discomfort_index && discomfort_index < 75 ){
+				$("h2.feels").text("暑くない");
+				$("h2.feels").css('color', '#00FF00');
+				$("h2.problem").text("ダニ・カビ");
+				$("h2.problem").css('color', '#00FF00');
+			} else if (75 <= discomfort_index && discomfort_index < 80 ){
+				$("h2.feels").text("やや暑い");
+				$("h2.feels").css('color', '#FF1A6F');
+				$("h2.problem").text("ダニ・カビ");
+				$("h2.problem").css('color', '#FF1A6F');
+			} else if (80 <= discomfort_index && discomfort_index < 85 ){
+				$("h2.feels").text("暑くて汗が出る");
+				$("h2.feels").css('color', '#EE0000');
+				$("h2.problem").text("ダニ・カビ・食中毒");
+				$("h2.problem").css('color', '#EE0000');
+			} else if (85 <= discomfort_index ){
+				$("h2.feels").text("暑くてたまらない");
+				$("h2.feels").css('color', '#FF0000');
+				$("h2.problem").text("食中毒");
+				$("h2.problem").css('color', '#FF0000');
+			}
+		}
+
+		var timestamp_labels = [];
+		var temperatures = [];
+		var humiditys = [];
+
+		$(function() {
+			// データ取得
+			var ref_temperature = firebase.database().ref('/items/temperature');
+			var ref_humidity = firebase.database().ref('/items/humidity');
+
+			// 温度データ読み込み
+			ref_temperature.on('child_added', function(snapshot) {
+				timestamp_labels.push(snapshot.val().timestamp);
+				temperatures.push(snapshot.val().temperature);
+				console.log(snapshot.val().timestamp);
+				window.myLine.update();
+				updateDiscomfortIndex();
+		 	});
+		  
+			// 湿度データ読み込み
+			ref_humidity.on('child_added', function(snapshot) {
+				humiditys.push(snapshot.val().humidity);
+				console.log(snapshot.val().timestamp);
+				window.myLine.update();
+				updateDiscomfortIndex();
+			});
+
+		});
+
+		//グラフ描画
+		var config = {
+			type: 'line',
+			data: {
+				labels: timestamp_labels,
+				datasets: [{
+					label: '温度',
+					backgroundColor: window.chartColors.red,
+					borderColor: window.chartColors.red,
+					data: temperatures,
+					fill: false,
+				}, {
+					label: '湿度',
+					fill: false,
+					backgroundColor: window.chartColors.blue,
+					borderColor: window.chartColors.blue,
+					data: humiditys,
+				}]
+			},
+			options: {
+				responsive: true,
+				title: {
+					display: true,
+					text: '頭皮環境チャート'
+				},
+				tooltips: {
+					mode: 'index',
+					intersect: false,
+				},
+				hover: {
+					mode: 'nearest',
+					intersect: true
+				},
+				scales: {
+					xAxes: [{
+						display: true,
+						scaleLabel: {
+							display: true,
+							labelString: 'Time'
+						}
+					}],
+					yAxes: [{
+						display: true,
+						scaleLabel: {
+							display: true,
+							labelString: 'Value'
+						}
+					}]
+				}
+			}
+		};
+
+		window.onload = function() {
+			var ctx = document.getElementById('canvas').getContext('2d');
+			window.myLine = new Chart(ctx, config);
+		};
+
+	</script>
+	<table>
+		<tr>
+			<th>
+				<p>只今の不快指数: </p>
+				<h2 class="discomfortIndex">xxx</h2>
+			</th>
+			<th>
+				<p>体感</p>
+				<h2 class="feels">yyy</h2>
+			</th>
+			<th>
+				<p>弊害</p>
+				<h2 class="problem">zzz</h2>
+			</th>
+		</tr>
+	</table>
+</body>
+
+</html>
+
